@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = "1.0.91"
 clap = { version = "4.5.20", features = ["derive"] }
 itertools = "0.13.0"
-reqwest = "0.12.8"
+reqwest = { version = "0.12.8", features = ["rustls-tls"] }
 tokio = { version = "1.41.0", features = ["full"] }
 
 [dev-dependencies]
