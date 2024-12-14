@@ -1,23 +1,10 @@
-use clap::Parser;
+use cli::ParsedArgs;
 use itertools::Itertools;
-use reqwest::{Client, Method, RequestBuilder, StatusCode, Url};
+use properties::RequestProperty;
+use reqwest::{Client, RequestBuilder, StatusCode, Url};
 
-#[derive(Clone, Debug)]
-enum RequestProperty {
-    QueryParameter { key: String, value: String },
-    Header { key: String, value: String },
-    Body { body: String },
-}
-
-impl RequestProperty {
-    fn add_to_request(&self, builder: RequestBuilder) -> RequestBuilder {
-        match self {
-            RequestProperty::QueryParameter { key, value } => builder.query(&[(key, value)]),
-            RequestProperty::Header { key, value } => builder.header(key, value),
-            RequestProperty::Body { body } => builder.body(body.clone()),
-        }
-    }
-}
+mod cli;
+mod properties;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ResponseCriteria {
@@ -25,14 +12,9 @@ struct ResponseCriteria {
     body: String,
 }
 
-#[derive(Parser)]
-struct Args {
-    url: String,
-}
-
 #[tokio::main]
 async fn main() {
-    let args = Args::parse();
+    let args = cli::get_args().unwrap();
 
     match do_thing(args).await {
         Ok(criteria) => println!("Valid criteria: {criteria:?}"),
@@ -40,19 +22,20 @@ async fn main() {
     };
 }
 
-async fn do_thing(args: Args) -> anyhow::Result<Option<Vec<RequestProperty>>> {
-    let mut url = Url::parse(&args.url)?;
-    let properties = parse_query(&url);
+async fn do_thing(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProperty>>> {
+    let mut url = args.url.clone();
+    let mut properties = parse_query(&url);
+    properties.extend(args.headers);
 
     let client = Client::builder().use_rustls_tls().build()?;
-    let goal = send_request(client.request(Method::GET, url.clone())).await?;
+    let goal = send_request(client.request(args.method.clone(), url.clone())).await?;
 
     url.set_query(None);
 
     for i in 0..=properties.len() {
         for combination in properties.iter().combinations(i) {
             let request = combination.iter().fold(
-                client.request(Method::GET, url.clone()),
+                client.request(args.method.clone(), url.clone()),
                 |builder, property| property.add_to_request(builder),
             );
 
