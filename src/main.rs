@@ -1,7 +1,7 @@
 use cli::ParsedArgs;
 use itertools::Itertools;
-use properties::RequestProperty;
-use reqwest::{Client, RequestBuilder, StatusCode, Url};
+use properties::{synthesize_request, RequestProperty};
+use reqwest::{Client, RequestBuilder, StatusCode};
 
 mod cli;
 mod properties;
@@ -16,27 +16,26 @@ struct ResponseCriteria {
 async fn main() {
     let args = cli::get_args().unwrap();
 
-    match do_thing(args).await {
+    match run_glaive(args).await {
         Ok(criteria) => println!("Valid criteria: {criteria:?}"),
         Err(a) => println!("Error: {}", a),
     };
 }
 
-async fn do_thing(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProperty>>> {
-    let mut url = args.url.clone();
-    let mut properties = parse_query(&url);
-    properties.extend(args.headers);
-
+async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProperty>>> {
     let client = Client::builder().use_rustls_tls().build()?;
-    let goal = send_request(client.request(args.method.clone(), url.clone())).await?;
 
-    url.set_query(None);
+    let goal_request = synthesize_request(
+        &args.properties.iter().collect(),
+        client.request(args.method.clone(), args.url.clone()),
+    );
+    let goal = send_request(goal_request).await?;
 
-    for i in 0..=properties.len() {
-        for combination in properties.iter().combinations(i) {
-            let request = combination.iter().fold(
-                client.request(args.method.clone(), url.clone()),
-                |builder, property| property.add_to_request(builder),
+    for i in 0..=args.properties.len() {
+        for combination in args.properties.iter().combinations(i) {
+            let request = synthesize_request(
+                &combination,
+                client.request(args.method.clone(), args.url.clone()),
             );
 
             let response = send_request(request).await?;
@@ -47,15 +46,6 @@ async fn do_thing(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProperty
     }
 
     Ok(None)
-}
-
-fn parse_query(url: &Url) -> Vec<RequestProperty> {
-    url.query_pairs()
-        .map(|(key, value)| RequestProperty::QueryParameter {
-            key: key.into_owned(),
-            value: value.into_owned(),
-        })
-        .collect()
 }
 
 async fn send_request(request: RequestBuilder) -> anyhow::Result<ResponseCriteria> {

@@ -32,34 +32,62 @@ struct Args {
     request: Methods,
 
     #[arg(short = 'H', long, value_parser = validate_header, help = "key-value pair separated by a colon (:)")]
-    header: Vec<RequestProperty>,
+    header: Vec<Vec<RequestProperty>>,
 }
 
-fn validate_header(s: &str) -> Result<RequestProperty, String> {
+fn validate_header(s: &str) -> Result<Vec<RequestProperty>, String> {
     let mut str_iter = s.splitn(2, ":");
+    let key = str_iter
+        .next()
+        .ok_or(format!("{} is not a valid header", s))?
+        .trim();
+    let value = str_iter
+        .next()
+        .ok_or(format!("{} is not a valid header", s))?
+        .trim();
 
-    Ok(RequestProperty::Header {
-        key: str_iter
-            .next()
-            .ok_or(format!("{} is not a valid header", s))?
-            .trim()
-            .to_string(),
-        value: str_iter
-            .next()
-            .ok_or(format!("{} is not a valid header", s))?
-            .trim()
-            .to_string(),
-    })
+    if key.to_lowercase() == "cookie" {
+        return Ok(value
+            .split(';')
+            .map(|c| RequestProperty::Cookie {
+                cookie: c.trim().to_string(),
+            })
+            .collect());
+    }
+
+    Ok(vec![RequestProperty::Header {
+        key: key.to_string(),
+        value: value.to_string(),
+    }])
+}
+
+fn parse_queries(url: &Url) -> Vec<RequestProperty> {
+    url.query_pairs()
+        .map(|(key, value)| RequestProperty::QueryParameter {
+            key: key.into_owned(),
+            value: value.into_owned(),
+        })
+        .collect()
 }
 
 pub struct ParsedArgs {
     pub url: Url,
     pub method: Method,
-    pub headers: Vec<RequestProperty>,
+    pub properties: Vec<RequestProperty>,
 }
 
 pub fn get_args() -> anyhow::Result<ParsedArgs> {
-    let args = Args::parse();
+    let mut args = Args::parse();
+
+    let queries = parse_queries(&args.url);
+    let properties: Vec<RequestProperty> = args
+        .header
+        .into_iter()
+        .flatten()
+        .chain(queries.into_iter())
+        .collect();
+
+    args.url.set_query(None);
 
     Ok(ParsedArgs {
         url: args.url,
@@ -74,6 +102,6 @@ pub fn get_args() -> anyhow::Result<ParsedArgs> {
             Methods::PATCH => Method::PATCH,
             Methods::TRACE => Method::TRACE,
         },
-        headers: args.header,
+        properties,
     })
 }
