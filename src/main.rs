@@ -1,7 +1,10 @@
+use std::{collections::VecDeque, sync::Arc};
+
 use cli::ParsedArgs;
 use itertools::Itertools;
 use properties::{synthesize_request, RequestProperty};
 use reqwest::{Client, RequestBuilder, StatusCode};
+use tokio::sync::Semaphore;
 
 mod cli;
 mod properties;
@@ -31,6 +34,9 @@ async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProper
     );
     let goal = send_request(goal_request).await?;
 
+    let mut tasks = VecDeque::new();
+    let semaphore = Arc::new(Semaphore::new(20));
+
     for i in 0..=args.properties.len() {
         for combination in args.properties.iter().combinations(i) {
             let request = synthesize_request(
@@ -38,14 +44,45 @@ async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProper
                 client.request(args.method.clone(), args.url.clone()),
             );
 
-            let response = send_request(request).await?;
-            if response == goal {
-                return Ok(Some(combination.iter().map(|&x| x.clone()).collect()));
-            }
+            tasks.push_back((
+                combination,
+                tokio::spawn(create_request(request, goal.clone(), semaphore.clone())),
+            ));
         }
     }
 
-    Ok(None)
+    let mut answer = None;
+    while let Some((combination, handle)) = tasks.pop_front() {
+        if handle.await?? {
+            answer = Some(combination.iter().map(|&c| c.clone()).collect());
+            break;
+        }
+    }
+
+    for (_, task) in tasks {
+        task.abort();
+    }
+
+    Ok(answer)
+}
+
+async fn create_request(
+    request: RequestBuilder,
+    goal: ResponseCriteria,
+    semaphore: Arc<Semaphore>,
+) -> anyhow::Result<bool> {
+    let s = match semaphore.acquire().await {
+        Ok(s) => s,
+        Err(_) => return Ok(false),
+    };
+
+    let response = send_request(request).await?;
+    drop(s);
+    if response == goal {
+        semaphore.close();
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 async fn send_request(request: RequestBuilder) -> anyhow::Result<ResponseCriteria> {
