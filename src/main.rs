@@ -35,7 +35,7 @@ async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProper
     let goal = send_request(goal_request).await?;
 
     let mut tasks = VecDeque::new();
-    let semaphore = Arc::new(Semaphore::new(20));
+    let semaphore = Arc::new(Semaphore::new(args.concurrency));
 
     for i in 0..=args.properties.len() {
         for combination in args.properties.iter().combinations(i) {

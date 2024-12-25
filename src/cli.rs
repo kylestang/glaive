@@ -28,11 +28,19 @@ impl Display for Methods {
 struct Args {
     url: Url,
 
+    // Glaive options
+    #[arg(short = 'c', long, default_value_t = 10)]
+    concurrency: usize,
+
+    // Curl options
     #[arg(short = 'X', long, default_value_t = Methods::GET)]
     request: Methods,
 
     #[arg(short = 'H', long, value_parser = validate_header, help = "key-value pair separated by a colon (:)")]
     header: Vec<Vec<RequestProperty>>,
+
+    #[arg(long = "data-raw", help = "raw request body")]
+    raw_data: Option<String>,
 }
 
 fn validate_header(s: &str) -> Result<Vec<RequestProperty>, String> {
@@ -74,34 +82,42 @@ pub struct ParsedArgs {
     pub url: Url,
     pub method: Method,
     pub properties: Vec<RequestProperty>,
+    pub concurrency: usize,
 }
 
 pub fn get_args() -> anyhow::Result<ParsedArgs> {
     let mut args = Args::parse();
 
     let queries = parse_queries(&args.url);
-    let properties: Vec<RequestProperty> = args
+    let mut properties: Vec<RequestProperty> = args
         .header
         .into_iter()
         .flatten()
         .chain(queries.into_iter())
         .collect();
 
+    if let Some(data) = args.raw_data {
+        properties.push(RequestProperty::Body { body: data });
+    }
+
     args.url.set_query(None);
+
+    let method = match args.request {
+        Methods::GET => Method::GET,
+        Methods::POST => Method::POST,
+        Methods::PUT => Method::PUT,
+        Methods::DELETE => Method::DELETE,
+        Methods::HEAD => Method::HEAD,
+        Methods::OPTIONS => Method::OPTIONS,
+        Methods::CONNECT => Method::CONNECT,
+        Methods::PATCH => Method::PATCH,
+        Methods::TRACE => Method::TRACE,
+    };
 
     Ok(ParsedArgs {
         url: args.url,
-        method: match args.request {
-            Methods::GET => Method::GET,
-            Methods::POST => Method::POST,
-            Methods::PUT => Method::PUT,
-            Methods::DELETE => Method::DELETE,
-            Methods::HEAD => Method::HEAD,
-            Methods::OPTIONS => Method::OPTIONS,
-            Methods::CONNECT => Method::CONNECT,
-            Methods::PATCH => Method::PATCH,
-            Methods::TRACE => Method::TRACE,
-        },
+        method,
         properties,
+        concurrency: args.concurrency,
     })
 }
