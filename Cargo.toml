@@ -2,13 +2,15 @@
 name = "glaive"
 version = "0.1.0"
 edition = "2021"
+license = "ISC"
+description = "Cut your http requests to pieces"
+repository = "https://github.com/kylestang/glaive"
 
 [dependencies]
-anyhow = "1.0.91"
-clap = { version = "4.5.20", features = ["derive"] }
-itertools = "0.13.0"
-reqwest = { version = "0.12.8", features = ["rustls-tls"] }
-tokio = { version = "1.41.0", features = ["full"] }
+anyhow = "1.0.95"
+clap = { version = "4.5.23", features = ["derive"] }
+reqwest = { version = "0.12.9", features = ["rustls-tls"] }
+tokio = { version = "1.42.0", features = ["full"] }
 
 [profile.release]
 codegen-units = 1
