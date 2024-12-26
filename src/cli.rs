@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use crate::RequestProperty;
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, ValueEnum, Debug)]
 #[value(rename_all = "UPPER")]
 enum Methods {
@@ -89,12 +90,8 @@ pub fn get_args() -> anyhow::Result<ParsedArgs> {
     let mut args = Args::parse();
 
     let queries = parse_queries(&args.url);
-    let mut properties: Vec<RequestProperty> = args
-        .header
-        .into_iter()
-        .flatten()
-        .chain(queries.into_iter())
-        .collect();
+    let mut properties: Vec<RequestProperty> =
+        args.header.into_iter().flatten().chain(queries).collect();
 
     if let Some(data) = args.raw_data {
         properties.push(RequestProperty::Body { body: data });

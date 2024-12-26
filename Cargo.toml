@@ -10,5 +10,6 @@ itertools = "0.13.0"
 reqwest = { version = "0.12.8", features = ["rustls-tls"] }
 tokio = { version = "1.41.0", features = ["full"] }
 
-[dev-dependencies]
-rstest = "0.23.0"
+[profile.release]
+codegen-units = 1
+lto = "fat"
