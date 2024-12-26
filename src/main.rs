@@ -4,7 +4,7 @@ use cli::ParsedArgs;
 use itertools::Itertools;
 use properties::{synthesize_request, RequestProperty};
 use reqwest::{Client, RequestBuilder, StatusCode};
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 mod cli;
 mod properties;
@@ -44,10 +44,17 @@ async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProper
                 client.request(args.method.clone(), args.url.clone()),
             );
 
+            let permit = match semaphore.clone().acquire_owned().await {
+                Ok(permit) => permit,
+                Err(_) => break,
+            };
             tasks.push_back((
                 combination,
-                tokio::spawn(create_request(request, goal.clone(), semaphore.clone())),
+                tokio::spawn(create_request(request, goal.clone(), permit)),
             ));
+        }
+        if semaphore.is_closed() {
+            break;
         }
     }
 
@@ -69,17 +76,11 @@ async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProper
 async fn create_request(
     request: RequestBuilder,
     goal: ResponseCriteria,
-    semaphore: Arc<Semaphore>,
+    permit: OwnedSemaphorePermit,
 ) -> anyhow::Result<bool> {
-    let s = match semaphore.acquire().await {
-        Ok(s) => s,
-        Err(_) => return Ok(false),
-    };
-
     let response = send_request(request).await?;
-    drop(s);
     if response == goal {
-        semaphore.close();
+        permit.semaphore().close();
         return Ok(true);
     }
     Ok(false)
