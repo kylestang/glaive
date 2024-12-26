@@ -2,7 +2,7 @@
 
 *Cut your http requests to pieces*
 
-Glaive is an API reverse engineering tool. It makes an initial http request and then tests every combination of the request properties to find the minimum set of properties needed to return the same response.
+Glaive is an API reverse engineering tool. It makes an initial http request and then removes properties one by one to determine the smallest set of properties needed to return the same response.
 
 The properties Glaive currently tests are:
 - headers
@@ -21,11 +21,10 @@ Arguments:
   <URL>
 
 Options:
-  -c, --concurrency <CONCURRENCY>  [default: 10]
   -X, --request <REQUEST>          [default: GET] [possible values: GET, POST, PUT, DELETE, HEAD, OPTIONS, CONNECT, PATCH, TRACE]
   -H, --header <HEADER>            key-value pair separated by a colon (:)
       --data-raw <RAW_DATA>        raw request body
   -h, --help                       Print help
 ```
 
-By default Glaive runs 10 concurrent requests at a time to prevent overloading the destination server. You can set a different limit with the `-c` flag. Glaive sends up to `2^(number of properties)` requests, please be careful not to DOS others.
+Glaive does briefly spam the server with requests, please use responsibly.

@@ -9,7 +9,7 @@ pub enum RequestProperty {
 }
 
 pub fn synthesize_request(
-    properties: &Vec<&RequestProperty>,
+    properties: &Vec<RequestProperty>,
     mut builder: RequestBuilder,
 ) -> RequestBuilder {
     let mut cookies: Vec<&str> = Vec::new();

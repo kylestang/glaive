@@ -1,10 +1,7 @@
-use std::{collections::VecDeque, sync::Arc};
-
+use anyhow::anyhow;
 use cli::ParsedArgs;
-use itertools::Itertools;
 use properties::{synthesize_request, RequestProperty};
 use reqwest::{Client, RequestBuilder, StatusCode};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 mod cli;
 mod properties;
@@ -20,70 +17,50 @@ async fn main() {
     let args = cli::get_args().unwrap();
 
     match run_glaive(args).await {
-        Ok(criteria) => println!("Valid criteria: {criteria:?}"),
+        Ok(properties) => println!("Required Properties: {properties:?}"),
         Err(a) => println!("Error: {}", a),
     };
 }
 
-async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Option<Vec<RequestProperty>>> {
+async fn run_glaive(args: ParsedArgs) -> anyhow::Result<Vec<RequestProperty>> {
     let client = Client::builder().use_rustls_tls().build()?;
 
     let goal_request = synthesize_request(
-        &args.properties.iter().collect(),
+        &args.properties,
         client.request(args.method.clone(), args.url.clone()),
     );
-    let goal = send_request(goal_request).await?;
-
-    let mut tasks = VecDeque::new();
-    let semaphore = Arc::new(Semaphore::new(args.concurrency));
-
-    for i in 0..=args.properties.len() {
-        for combination in args.properties.iter().combinations(i) {
-            let request = synthesize_request(
-                &combination,
-                client.request(args.method.clone(), args.url.clone()),
-            );
-
-            let permit = match semaphore.clone().acquire_owned().await {
-                Ok(permit) => permit,
-                Err(_) => break,
-            };
-            tasks.push_back((
-                combination,
-                tokio::spawn(create_request(request, goal.clone(), permit)),
-            ));
-        }
-        if semaphore.is_closed() {
-            break;
-        }
+    let goal = send_request(
+        goal_request
+            .try_clone()
+            .ok_or(anyhow!("look, this shouldn't have been possible. I don't know how it happened. Maybe take up knitting instead?"))?,
+    )
+    .await?;
+    let sanity_check = send_request(goal_request).await?;
+    if goal != sanity_check {
+        return Err(anyhow!(
+            "sanity check failed, two requests with all properties returned different results"
+        ));
     }
 
-    let mut answer = None;
-    while let Some((combination, handle)) = tasks.pop_front() {
-        if handle.await?? {
-            answer = Some(combination.iter().map(|&c| c.clone()).collect());
-            break;
+    let mut required = args.properties.clone();
+    let mut i = 0;
+
+    while i < required.len() {
+        let mut test = required.clone();
+        test.remove(i);
+
+        let test_req =
+            synthesize_request(&test, client.request(args.method.clone(), args.url.clone()));
+
+        let response = send_request(test_req).await?;
+        if response == goal {
+            required = test;
+        } else {
+            i += 1;
         }
     }
 
-    for (_, task) in tasks {
-        task.abort();
-    }
-
-    Ok(answer)
-}
-
-async fn create_request(
-    request: RequestBuilder,
-    goal: ResponseCriteria,
-    permit: OwnedSemaphorePermit,
-) -> anyhow::Result<bool> {
-    let response = send_request(request).await?;
-    if response == goal {
-        permit.semaphore().close();
-        return Ok(true);
-    }
-    Ok(false)
+    Ok(required)
 }
 
 async fn send_request(request: RequestBuilder) -> anyhow::Result<ResponseCriteria> {

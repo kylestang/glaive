@@ -29,10 +29,6 @@ impl Display for Methods {
 struct Args {
     url: Url,
 
-    // Glaive options
-    #[arg(short = 'c', long, default_value_t = 10)]
-    concurrency: usize,
-
     // Curl options
     #[arg(short = 'X', long, default_value_t = Methods::GET)]
     request: Methods,
@@ -83,7 +79,6 @@ pub struct ParsedArgs {
     pub url: Url,
     pub method: Method,
     pub properties: Vec<RequestProperty>,
-    pub concurrency: usize,
 }
 
 pub fn get_args() -> anyhow::Result<ParsedArgs> {
@@ -115,6 +110,5 @@ pub fn get_args() -> anyhow::Result<ParsedArgs> {
         url: args.url,
         method,
         properties,
-        concurrency: args.concurrency,
     })
 }
