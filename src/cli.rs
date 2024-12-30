@@ -38,6 +38,12 @@ struct Args {
 
     #[arg(long = "data-raw", help = "raw request body")]
     raw_data: Option<String>,
+
+    #[arg(
+        long,
+        help = "this doesn't do anything, but is added for compatibility"
+    )]
+    compressed: bool,
 }
 
 fn validate_header(s: &str) -> Result<Vec<RequestProperty>, String> {

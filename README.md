@@ -27,10 +27,11 @@ Arguments:
   <URL>
 
 Options:
-  -X, --request <REQUEST>          [default: GET] [possible values: GET, POST, PUT, DELETE, HEAD, OPTIONS, CONNECT, PATCH, TRACE]
-  -H, --header <HEADER>            key-value pair separated by a colon (:)
-      --data-raw <RAW_DATA>        raw request body
-  -h, --help                       Print help
+  -X, --request <REQUEST>    [default: GET] [possible values: GET, POST, PUT, DELETE, HEAD, OPTIONS, CONNECT, PATCH, TRACE]
+  -H, --header <HEADER>      key-value pair separated by a colon (:)
+      --data-raw <RAW_DATA>  raw request body
+      --compressed           this doesn't do anything, but is added for compatibility
+  -h, --help                 Print help
 ```
 
 Glaive does briefly spam the server with requests, please use responsibly.
