@@ -12,6 +12,12 @@ The properties Glaive currently tests are:
 
 Requests are defined using a subset of the `cURL` CLI flags. Most of the time you should be able to take a `curl ...` command, replace it with `glaive ...`, and it will just work. Many apps also export requests as curl such as web browsers, postman, mitmproxy, etc.
 
+## Installation
+
+```bash
+cargo install glaive
+```
+
 ## Usage
 
 ```
